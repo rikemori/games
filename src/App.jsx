@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-const GAME_DURATION = 60
+const GAME_DURATION = 30
 const HOLE_COUNT = 9
-const HIGH_SCORE_KEY = 'whack-a-mole-high-score'
+const RECORDS_KEY = 'whack-a-mole-records'
+const DEV_PASSWORD = 'mogumogu'
 
 function getShowDuration(timeLeft) {
   const progress = 1 - timeLeft / GAME_DURATION
@@ -22,20 +23,36 @@ function randomDelay(min, max) {
   return min + Math.random() * (max - min)
 }
 
+function loadRecords() {
+  try {
+    const raw = localStorage.getItem(RECORDS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveRecord(score) {
+  const records = loadRecords()
+  records.push({ score, playedAt: new Date().toISOString() })
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+}
+
 function App() {
   const [phase, setPhase] = useState('idle') // idle | playing | gameover
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [activeHole, setActiveHole] = useState(null)
-  const [highScore, setHighScore] = useState(
-    () => Number(localStorage.getItem(HIGH_SCORE_KEY)) || 0,
-  )
-  const [isNewRecord, setIsNewRecord] = useState(false)
+
+  const [devPasswordOpen, setDevPasswordOpen] = useState(false)
+  const [devPanelOpen, setDevPanelOpen] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState(false)
+  const [records, setRecords] = useState([])
 
   const timeLeftRef = useRef(GAME_DURATION)
   const activeHoleRef = useRef(null)
   const scoreRef = useRef(0)
-  const highScoreRef = useRef(highScore)
   const moleTimeoutRef = useRef(null)
   const tickIntervalRef = useRef(null)
   const runningRef = useRef(false)
@@ -60,16 +77,7 @@ function App() {
     clearInterval(tickIntervalRef.current)
     activeHoleRef.current = null
     setActiveHole(null)
-
-    const finalScore = scoreRef.current
-    if (finalScore > highScoreRef.current) {
-      highScoreRef.current = finalScore
-      localStorage.setItem(HIGH_SCORE_KEY, String(finalScore))
-      setHighScore(finalScore)
-      setIsNewRecord(true)
-    } else {
-      setIsNewRecord(false)
-    }
+    saveRecord(scoreRef.current)
     setPhase('gameover')
   }
 
@@ -83,7 +91,6 @@ function App() {
     timeLeftRef.current = GAME_DURATION
     activeHoleRef.current = null
     setActiveHole(null)
-    setIsNewRecord(false)
     setPhase('playing')
     runningRef.current = true
 
@@ -106,6 +113,31 @@ function App() {
     moleTimeoutRef.current = setTimeout(spawnMole, randomDelay(150, 400))
   }
 
+  const openDevPrompt = () => {
+    setPasswordInput('')
+    setPasswordError(false)
+    setDevPasswordOpen(true)
+  }
+
+  const closeDevPrompt = () => {
+    setDevPasswordOpen(false)
+    setPasswordInput('')
+    setPasswordError(false)
+  }
+
+  const handleDevSubmit = (e) => {
+    e.preventDefault()
+    if (passwordInput === DEV_PASSWORD) {
+      setRecords(loadRecords())
+      setDevPanelOpen(true)
+      setDevPasswordOpen(false)
+      setPasswordInput('')
+      setPasswordError(false)
+    } else {
+      setPasswordError(true)
+    }
+  }
+
   useEffect(() => {
     return () => {
       runningRef.current = false
@@ -120,8 +152,7 @@ function App() {
         <div className="panel">
           <p className="eyebrow">Whack-a-Mole</p>
           <h1 className="title">もぐらたたき</h1>
-          <p className="subtitle">60秒間でできるだけ多くのモグラを叩こう！</p>
-          {highScore > 0 && <p className="high-score">ハイスコア：{highScore}</p>}
+          <p className="subtitle">30秒間でできるだけ多くのモグラを叩こう！</p>
           <button type="button" className="primary-button" onClick={startGame}>
             スタート
           </button>
@@ -170,15 +201,72 @@ function App() {
               <div className="overlay-card">
                 <p className="overlay-title">タイムアップ！</p>
                 <p className="overlay-score">スコア：{score}</p>
-                <p className="overlay-highscore">
-                  {isNewRecord ? '🎉 新記録！' : `ハイスコア：${highScore}`}
-                </p>
                 <button type="button" className="primary-button" onClick={startGame}>
                   もう一度遊ぶ
                 </button>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="dev-gate"
+        onClick={openDevPrompt}
+        aria-label="開発者モード"
+      >
+        ⚙
+      </button>
+
+      {devPasswordOpen && (
+        <div className="dev-overlay">
+          <form className="dev-card" onSubmit={handleDevSubmit}>
+            <p className="dev-title">開発者モード</p>
+            <input
+              type="password"
+              className="dev-input"
+              value={passwordInput}
+              onChange={(e) => {
+                setPasswordInput(e.target.value)
+                setPasswordError(false)
+              }}
+              placeholder="パスワード"
+              autoFocus
+            />
+            {passwordError && <p className="dev-error">パスワードが違います</p>}
+            <div className="dev-actions">
+              <button type="button" className="dev-button ghost" onClick={closeDevPrompt}>
+                キャンセル
+              </button>
+              <button type="submit" className="dev-button">
+                入る
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {devPanelOpen && (
+        <div className="dev-overlay">
+          <div className="dev-card dev-panel">
+            <p className="dev-title">全プレイヤーの記録</p>
+            <p className="dev-count">{records.length}件</p>
+            <div className="dev-records">
+              {records.length === 0 && <p className="dev-empty">まだ記録がありません</p>}
+              {[...records].reverse().map((r, i) => (
+                <div key={i} className="dev-record-row">
+                  <span className="dev-record-score">{r.score}点</span>
+                  <span className="dev-record-date">
+                    {new Date(r.playedAt).toLocaleString('ja-JP')}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="dev-button" onClick={() => setDevPanelOpen(false)}>
+              閉じる
+            </button>
+          </div>
         </div>
       )}
     </div>
