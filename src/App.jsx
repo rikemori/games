@@ -18,6 +18,10 @@ function randomHole(excludeIndex) {
   return idx
 }
 
+function randomDelay(min, max) {
+  return min + Math.random() * (max - min)
+}
+
 function App() {
   const [phase, setPhase] = useState('idle') // idle | playing | gameover
   const [score, setScore] = useState(0)
@@ -30,6 +34,8 @@ function App() {
 
   const timeLeftRef = useRef(GAME_DURATION)
   const activeHoleRef = useRef(null)
+  const scoreRef = useRef(0)
+  const highScoreRef = useRef(highScore)
   const moleTimeoutRef = useRef(null)
   const tickIntervalRef = useRef(null)
   const runningRef = useRef(false)
@@ -44,7 +50,7 @@ function App() {
     moleTimeoutRef.current = setTimeout(() => {
       activeHoleRef.current = null
       setActiveHole(null)
-      moleTimeoutRef.current = setTimeout(spawnMole, 150 + Math.random() * 300)
+      moleTimeoutRef.current = setTimeout(spawnMole, randomDelay(150, 450))
     }, showDuration)
   }
 
@@ -54,6 +60,16 @@ function App() {
     clearInterval(tickIntervalRef.current)
     activeHoleRef.current = null
     setActiveHole(null)
+
+    const finalScore = scoreRef.current
+    if (finalScore > highScoreRef.current) {
+      highScoreRef.current = finalScore
+      localStorage.setItem(HIGH_SCORE_KEY, String(finalScore))
+      setHighScore(finalScore)
+      setIsNewRecord(true)
+    } else {
+      setIsNewRecord(false)
+    }
     setPhase('gameover')
   }
 
@@ -61,6 +77,7 @@ function App() {
     clearTimeout(moleTimeoutRef.current)
     clearInterval(tickIntervalRef.current)
 
+    scoreRef.current = 0
     setScore(0)
     setTimeLeft(GAME_DURATION)
     timeLeftRef.current = GAME_DURATION
@@ -84,19 +101,10 @@ function App() {
     clearTimeout(moleTimeoutRef.current)
     activeHoleRef.current = null
     setActiveHole(null)
-    setScore((s) => s + 1)
-    moleTimeoutRef.current = setTimeout(spawnMole, 150 + Math.random() * 250)
+    scoreRef.current += 1
+    setScore(scoreRef.current)
+    moleTimeoutRef.current = setTimeout(spawnMole, randomDelay(150, 400))
   }
-
-  useEffect(() => {
-    if (phase !== 'gameover') return
-    if (score > highScore) {
-      localStorage.setItem(HIGH_SCORE_KEY, String(score))
-      setHighScore(score)
-      setIsNewRecord(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
 
   useEffect(() => {
     return () => {
