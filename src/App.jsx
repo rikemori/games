@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { supabase } from './supabaseClient'
 import './App.css'
 
 const GAME_DURATION = 30
@@ -55,6 +56,9 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [activeHole, setActiveHole] = useState(null)
 
+  const [submitName, setSubmitName] = useState('')
+  const [submitStatus, setSubmitStatus] = useState('idle') // idle | sending | success | error
+
   const [devPasswordOpen, setDevPasswordOpen] = useState(false)
   const [devPanelOpen, setDevPanelOpen] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
@@ -91,6 +95,8 @@ function App() {
     activeHoleRef.current = null
     setActiveHole(null)
     saveRecord(nicknameRef.current, playNumberRef.current, scoreRef.current)
+    setSubmitName(nicknameRef.current)
+    setSubmitStatus('idle')
     setPhase('gameover')
   }
 
@@ -135,6 +141,20 @@ function App() {
 
   const backToStartScreen = () => {
     setPhase('idle')
+  }
+
+  const handleSubmitScore = async (e) => {
+    e.preventDefault()
+    const trimmedName = submitName.trim()
+    if (!trimmedName || submitStatus === 'sending') return
+
+    setSubmitStatus('sending')
+    try {
+      const { error } = await supabase.from('scores').insert({ name: trimmedName, score: scoreRef.current })
+      setSubmitStatus(error ? 'error' : 'success')
+    } catch {
+      setSubmitStatus('error')
+    }
   }
 
   const openDevPrompt = () => {
@@ -240,6 +260,39 @@ function App() {
                 <p className="overlay-score">
                   {playedLabel}さんのスコア：{score}
                 </p>
+
+                <form className="submit-form" onSubmit={handleSubmitScore}>
+                  <input
+                    type="text"
+                    className="nickname-input"
+                    placeholder="名前を入力してランキングに登録"
+                    value={submitName}
+                    onChange={(e) => {
+                      setSubmitName(e.target.value)
+                      setSubmitStatus('idle')
+                    }}
+                    maxLength={16}
+                    disabled={submitStatus === 'sending' || submitStatus === 'success'}
+                  />
+                  {submitStatus === 'success' && (
+                    <p className="submit-message success">登録しました！</p>
+                  )}
+                  {submitStatus === 'error' && (
+                    <p className="submit-message error">送信に失敗しました。もう一度お試しください</p>
+                  )}
+                  <button
+                    type="submit"
+                    className="secondary-button"
+                    disabled={!submitName.trim() || submitStatus === 'sending' || submitStatus === 'success'}
+                  >
+                    {submitStatus === 'sending'
+                      ? '送信中…'
+                      : submitStatus === 'success'
+                        ? '登録済み'
+                        : 'スコアを登録する'}
+                  </button>
+                </form>
+
                 <button type="button" className="primary-button" onClick={backToStartScreen}>
                   もう一度遊ぶ
                 </button>
