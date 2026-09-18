@@ -42,9 +42,27 @@
 }
 
 .subtitle {
-  margin: 0 0 24px;
+  margin: 0 0 16px;
   color: #6b7d63;
   font-size: 16px;
+}
+
+.nickname-input {
+  width: 100%;
+  max-width: 240px;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  border-radius: 999px;
+  border: 2px solid #dcdcdc;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.nickname-input:focus {
+  outline: none;
+  border-color: #6fc35f;
 }
 
 .primary-button {
@@ -68,6 +86,13 @@
 
 .primary-button:active {
   transform: scale(0.97);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ---------- ゲーム画面 ---------- */
@@ -395,15 +420,31 @@
 
 .dev-record-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
   padding: 8px 12px;
   border-radius: 10px;
   background: #f5f7f3;
   font-size: 14px;
 }
 
+.dev-record-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dev-record-name {
+  font-weight: 700;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dev-record-score {
+  flex-shrink: 0;
   font-weight: 800;
   color: #3d5c2f;
 }

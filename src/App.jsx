@@ -32,14 +32,16 @@ function loadRecords() {
   }
 }
 
-function saveRecord(score) {
+function saveRecord(name, score) {
   const records = loadRecords()
-  records.push({ score, playedAt: new Date().toISOString() })
+  records.push({ name, score, playedAt: new Date().toISOString() })
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
 }
 
 function App() {
   const [phase, setPhase] = useState('idle') // idle | playing | gameover
+  const [nickname, setNickname] = useState('')
+  const [playedName, setPlayedName] = useState('')
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [activeHole, setActiveHole] = useState(null)
@@ -52,6 +54,7 @@ function App() {
 
   const timeLeftRef = useRef(GAME_DURATION)
   const activeHoleRef = useRef(null)
+  const nicknameRef = useRef('')
   const scoreRef = useRef(0)
   const moleTimeoutRef = useRef(null)
   const tickIntervalRef = useRef(null)
@@ -77,14 +80,19 @@ function App() {
     clearInterval(tickIntervalRef.current)
     activeHoleRef.current = null
     setActiveHole(null)
-    saveRecord(scoreRef.current)
+    saveRecord(nicknameRef.current, scoreRef.current)
     setPhase('gameover')
   }
 
   const startGame = () => {
+    const trimmedName = nickname.trim()
+    if (!trimmedName) return
+
     clearTimeout(moleTimeoutRef.current)
     clearInterval(tickIntervalRef.current)
 
+    nicknameRef.current = trimmedName
+    setPlayedName(trimmedName)
     scoreRef.current = 0
     setScore(0)
     setTimeLeft(GAME_DURATION)
@@ -111,6 +119,11 @@ function App() {
     scoreRef.current += 1
     setScore(scoreRef.current)
     moleTimeoutRef.current = setTimeout(spawnMole, randomDelay(150, 400))
+  }
+
+  const backToNicknameScreen = () => {
+    setNickname('')
+    setPhase('idle')
   }
 
   const openDevPrompt = () => {
@@ -153,7 +166,20 @@ function App() {
           <p className="eyebrow">Whack-a-Mole</p>
           <h1 className="title">もぐらたたき</h1>
           <p className="subtitle">30秒間でできるだけ多くのモグラを叩こう！</p>
-          <button type="button" className="primary-button" onClick={startGame}>
+          <input
+            type="text"
+            className="nickname-input"
+            placeholder="ニックネームを入力"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            maxLength={16}
+          />
+          <button
+            type="button"
+            className="primary-button"
+            onClick={startGame}
+            disabled={!nickname.trim()}
+          >
             スタート
           </button>
         </div>
@@ -200,9 +226,11 @@ function App() {
             <div className="overlay">
               <div className="overlay-card">
                 <p className="overlay-title">タイムアップ！</p>
-                <p className="overlay-score">スコア：{score}</p>
-                <button type="button" className="primary-button" onClick={startGame}>
-                  もう一度遊ぶ
+                <p className="overlay-score">
+                  {playedName}さんのスコア：{score}
+                </p>
+                <button type="button" className="primary-button" onClick={backToNicknameScreen}>
+                  つぎの人へ
                 </button>
               </div>
             </div>
@@ -256,7 +284,10 @@ function App() {
               {records.length === 0 && <p className="dev-empty">まだ記録がありません</p>}
               {[...records].reverse().map((r, i) => (
                 <div key={i} className="dev-record-row">
-                  <span className="dev-record-score">{r.score}点</span>
+                  <div className="dev-record-main">
+                    <span className="dev-record-name">{r.name || '（名前なし）'}</span>
+                    <span className="dev-record-score">{r.score}点</span>
+                  </div>
                   <span className="dev-record-date">
                     {new Date(r.playedAt).toLocaleString('ja-JP')}
                   </span>
