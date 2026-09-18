@@ -32,16 +32,25 @@ function loadRecords() {
   }
 }
 
-function saveRecord(name, score) {
+function saveRecord(name, playNumber, score) {
   const records = loadRecords()
-  records.push({ name, score, playedAt: new Date().toISOString() })
+  records.push({ name, playNumber, score, playedAt: new Date().toISOString() })
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+}
+
+function countPlaysByName(name) {
+  return loadRecords().filter((r) => r.name === name).length
+}
+
+function formatPlayerLabel(name, playNumber) {
+  const safeName = name || '（名前なし）'
+  return playNumber > 1 ? `${safeName}(${playNumber}回目)` : safeName
 }
 
 function App() {
   const [phase, setPhase] = useState('idle') // idle | playing | gameover
   const [nickname, setNickname] = useState('')
-  const [playedName, setPlayedName] = useState('')
+  const [playedLabel, setPlayedLabel] = useState('')
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [activeHole, setActiveHole] = useState(null)
@@ -55,6 +64,7 @@ function App() {
   const timeLeftRef = useRef(GAME_DURATION)
   const activeHoleRef = useRef(null)
   const nicknameRef = useRef('')
+  const playNumberRef = useRef(1)
   const scoreRef = useRef(0)
   const moleTimeoutRef = useRef(null)
   const tickIntervalRef = useRef(null)
@@ -80,7 +90,7 @@ function App() {
     clearInterval(tickIntervalRef.current)
     activeHoleRef.current = null
     setActiveHole(null)
-    saveRecord(nicknameRef.current, scoreRef.current)
+    saveRecord(nicknameRef.current, playNumberRef.current, scoreRef.current)
     setPhase('gameover')
   }
 
@@ -91,8 +101,10 @@ function App() {
     clearTimeout(moleTimeoutRef.current)
     clearInterval(tickIntervalRef.current)
 
+    const playNumber = countPlaysByName(trimmedName) + 1
     nicknameRef.current = trimmedName
-    setPlayedName(trimmedName)
+    playNumberRef.current = playNumber
+    setPlayedLabel(formatPlayerLabel(trimmedName, playNumber))
     scoreRef.current = 0
     setScore(0)
     setTimeLeft(GAME_DURATION)
@@ -121,8 +133,7 @@ function App() {
     moleTimeoutRef.current = setTimeout(spawnMole, randomDelay(150, 400))
   }
 
-  const backToNicknameScreen = () => {
-    setNickname('')
+  const backToStartScreen = () => {
     setPhase('idle')
   }
 
@@ -227,10 +238,10 @@ function App() {
               <div className="overlay-card">
                 <p className="overlay-title">タイムアップ！</p>
                 <p className="overlay-score">
-                  {playedName}さんのスコア：{score}
+                  {playedLabel}さんのスコア：{score}
                 </p>
-                <button type="button" className="primary-button" onClick={backToNicknameScreen}>
-                  つぎの人へ
+                <button type="button" className="primary-button" onClick={backToStartScreen}>
+                  もう一度遊ぶ
                 </button>
               </div>
             </div>
@@ -285,7 +296,9 @@ function App() {
               {[...records].reverse().map((r, i) => (
                 <div key={i} className="dev-record-row">
                   <div className="dev-record-main">
-                    <span className="dev-record-name">{r.name || '（名前なし）'}</span>
+                    <span className="dev-record-name">
+                      {formatPlayerLabel(r.name, r.playNumber || 1)}
+                    </span>
                     <span className="dev-record-score">{r.score}点</span>
                   </div>
                   <span className="dev-record-date">
