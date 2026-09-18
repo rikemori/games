@@ -56,14 +56,13 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION)
   const [activeHole, setActiveHole] = useState(null)
 
-  const [submitName, setSubmitName] = useState('')
-  const [submitStatus, setSubmitStatus] = useState('idle') // idle | sending | success | error
-
   const [devPasswordOpen, setDevPasswordOpen] = useState(false)
   const [devPanelOpen, setDevPanelOpen] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState(false)
   const [records, setRecords] = useState([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
+  const [recordsSource, setRecordsSource] = useState('remote') // remote | local
 
   const timeLeftRef = useRef(GAME_DURATION)
   const activeHoleRef = useRef(null)
@@ -95,9 +94,8 @@ function App() {
     activeHoleRef.current = null
     setActiveHole(null)
     saveRecord(nicknameRef.current, playNumberRef.current, scoreRef.current)
-    setSubmitName(nicknameRef.current)
-    setSubmitStatus('idle')
     setPhase('gameover')
+    submitScore(nicknameRef.current, scoreRef.current)
   }
 
   const startGame = () => {
@@ -143,17 +141,11 @@ function App() {
     setPhase('idle')
   }
 
-  const handleSubmitScore = async (e) => {
-    e.preventDefault()
-    const trimmedName = submitName.trim()
-    if (!trimmedName || submitStatus === 'sending') return
-
-    setSubmitStatus('sending')
+  const submitScore = async (name, score) => {
     try {
-      const { error } = await supabase.from('scores').insert({ name: trimmedName, score: scoreRef.current })
-      setSubmitStatus(error ? 'error' : 'success')
+      await supabase.from('scores').insert({ name, score })
     } catch {
-      setSubmitStatus('error')
+      // サーバーへの送信に失敗してもプレイヤーには通知しない
     }
   }
 
@@ -169,16 +161,32 @@ function App() {
     setPasswordError(false)
   }
 
-  const handleDevSubmit = (e) => {
+  const handleDevSubmit = async (e) => {
     e.preventDefault()
-    if (passwordInput === DEV_PASSWORD) {
-      setRecords(loadRecords())
-      setDevPanelOpen(true)
-      setDevPasswordOpen(false)
-      setPasswordInput('')
-      setPasswordError(false)
-    } else {
+    if (passwordInput !== DEV_PASSWORD) {
       setPasswordError(true)
+      return
+    }
+
+    setDevPasswordOpen(false)
+    setPasswordInput('')
+    setPasswordError(false)
+    setDevPanelOpen(true)
+    setRecordsLoading(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('scores')
+        .select('*')
+        .order('score', { ascending: false })
+      if (error) throw error
+      setRecords(data || [])
+      setRecordsSource('remote')
+    } catch {
+      setRecords([...loadRecords()].sort((a, b) => b.score - a.score))
+      setRecordsSource('local')
+    } finally {
+      setRecordsLoading(false)
     }
   }
 
@@ -261,38 +269,6 @@ function App() {
                   {playedLabel}さんのスコア：{score}
                 </p>
 
-                <form className="submit-form" onSubmit={handleSubmitScore}>
-                  <input
-                    type="text"
-                    className="nickname-input"
-                    placeholder="名前を入力してランキングに登録"
-                    value={submitName}
-                    onChange={(e) => {
-                      setSubmitName(e.target.value)
-                      setSubmitStatus('idle')
-                    }}
-                    maxLength={16}
-                    disabled={submitStatus === 'sending' || submitStatus === 'success'}
-                  />
-                  {submitStatus === 'success' && (
-                    <p className="submit-message success">登録しました！</p>
-                  )}
-                  {submitStatus === 'error' && (
-                    <p className="submit-message error">送信に失敗しました。もう一度お試しください</p>
-                  )}
-                  <button
-                    type="submit"
-                    className="secondary-button"
-                    disabled={!submitName.trim() || submitStatus === 'sending' || submitStatus === 'success'}
-                  >
-                    {submitStatus === 'sending'
-                      ? '送信中…'
-                      : submitStatus === 'success'
-                        ? '登録済み'
-                        : 'スコアを登録する'}
-                  </button>
-                </form>
-
                 <button type="button" className="primary-button" onClick={backToStartScreen}>
                   もう一度遊ぶ
                 </button>
@@ -343,23 +319,31 @@ function App() {
         <div className="dev-overlay">
           <div className="dev-card dev-panel">
             <p className="dev-title">全プレイヤーの記録</p>
-            <p className="dev-count">{records.length}件</p>
-            <div className="dev-records">
-              {records.length === 0 && <p className="dev-empty">まだ記録がありません</p>}
-              {[...records].reverse().map((r, i) => (
-                <div key={i} className="dev-record-row">
-                  <div className="dev-record-main">
-                    <span className="dev-record-name">
-                      {formatPlayerLabel(r.name, r.playNumber || 1)}
-                    </span>
-                    <span className="dev-record-score">{r.score}点</span>
+            <p className="dev-count">
+              {recordsSource === 'local' ? 'オフライン（ローカル保存分）・' : ''}
+              {records.length}件
+            </p>
+            {recordsLoading && <p className="dev-empty">読み込み中…</p>}
+            {!recordsLoading && (
+              <div className="dev-records">
+                {records.length === 0 && <p className="dev-empty">まだ記録がありません</p>}
+                {records.map((r, i) => (
+                  <div key={i} className="dev-record-row">
+                    <div className="dev-record-main">
+                      <span className="dev-record-name">
+                        {r.playNumber ? formatPlayerLabel(r.name, r.playNumber) : r.name || '（名前なし）'}
+                      </span>
+                      <span className="dev-record-score">{r.score}点</span>
+                    </div>
+                    {r.playedAt && (
+                      <span className="dev-record-date">
+                        {new Date(r.playedAt).toLocaleString('ja-JP')}
+                      </span>
+                    )}
                   </div>
-                  <span className="dev-record-date">
-                    {new Date(r.playedAt).toLocaleString('ja-JP')}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
             <button type="button" className="dev-button" onClick={() => setDevPanelOpen(false)}>
               閉じる
             </button>

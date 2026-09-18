@@ -282,55 +282,6 @@
   color: #444;
 }
 
-.submit-form {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px dashed #ddd;
-}
-
-.submit-form .nickname-input {
-  margin-bottom: 10px;
-}
-
-.submit-message {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.submit-message.success {
-  color: #4d9b3f;
-}
-
-.submit-message.error {
-  color: #e0453f;
-}
-
-.secondary-button {
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  color: #4d9b3f;
-  padding: 10px 24px;
-  border-radius: 999px;
-  border: 2px solid #7fd66c;
-  background: #fff;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.secondary-button:hover:not(:disabled) {
-  background: #f0faed;
-}
-
-.secondary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 @keyframes pop-in {
   0% {
     opacity: 0;
